@@ -107,7 +107,7 @@ client.connect('<INSTANCE_IP>', port=<SSH_PORT>, username='root', password='<PAS
 transport = client.get_transport()
 channel = transport.open_session()
 channel.get_pty()
-channel.exec_command('ps aux | grep train_lnp 2>/dev/null | grep -v grep; echo "---"; nvidia-smi --query-gpu=utilization.gpu,utilization.memory --format=csv 2>/dev/null; echo "---LOG---"; tail -10 <WORKING_DIR>/<LOG_FILE>.txt 2>/dev/null')
+channel.exec_command('ps aux | grep <TRAIN_PROCESS> 2>/dev/null | grep -v grep; echo "---"; nvidia-smi --query-gpu=utilization.gpu,utilization.memory --format=csv 2>/dev/null; echo "---LOG---"; tail -10 <WORKING_DIR>/<LOG_FILE>.txt 2>/dev/null')
 out = []
 while True:
     if channel.exit_status_ready(): break
@@ -177,9 +177,9 @@ scp -P <SSH_PORT> root@<INSTANCE_IP>:/remote/workspace/file.txt /local/path/
 Typical working directory: `/root/workspace/`
 
 Key paths to verify when troubleshooting:
-- Training scripts: `<WORKING_DIR>/unimol_AR/`
-- Model weights: `<WORKING_DIR>/mol_pre_no_h_220816.pt`
-- LMDB data: `<WORKING_DIR>/train.lmdb`
+- Training scripts: `<WORKING_DIR>/<PROJECT_DIR>/`
+- Model weights: `<WORKING_DIR>/<MODEL_FILE>.pt`
+- LMDB data: `<WORKING_DIR>/<DATA>.lmdb`
 - Dict file: `<WORKING_DIR>/dict.txt`
 
 ## Common Workflows
@@ -187,7 +187,7 @@ Key paths to verify when troubleshooting:
 ### 1. Submit Training Job
 
 1. Connect via SSH using `invoke_shell()`
-2. Upload training code via SFTP to `<WORKING_DIR>/unimol_AR/`
+2. Upload training code via SFTP to `<WORKING_DIR>/<PROJECT_DIR>/`
 3. Ensure model weights exist: `ls -la <WORKING_DIR>/*.pt`
 4. Run training: `CUDA_VISIBLE_DEVICES=<GPU_ID> nohup python -u <SCRIPT>.py > <LOG>.txt 2>&1 &`
 5. Disconnect — job continues in background
@@ -198,7 +198,7 @@ Key paths to verify when troubleshooting:
 Poll with `exec_command()` via `Transport.open_session()`:
 ```bash
 nvidia-smi --query-gpu=utilization.gpu,utilization.memory --format=csv
-ps aux | grep train_lnp | grep -v grep
+ps aux | grep <TRAIN_PROCESS> | grep -v grep
 tail -10 <WORKING_DIR>/<LOG>.txt
 ```
 
