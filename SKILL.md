@@ -174,24 +174,33 @@ scp -P <SSH_PORT> root@<INSTANCE_IP>:/remote/workspace/file.txt /local/path/
 
 ## Cloud-Specific Path Reference
 
-Typical working directory: `/root/workspace/`
+**IMPORTANT:** AI Galaxy instances have two disks:
+- **System disk**: 50GB (root partition `/`)
+- **Data disk**: 500GB+ (mounted at `/mnt/data` or similar)
+
+Store large training files on the **data disk**, not the system disk.
+
+Typical paths:
+- Working directory on data disk: `/mnt/data/workspace/` or `/data/workspace/`
+- System disk root: `/root/` (limited space, avoid large files)
 
 Key paths to verify when troubleshooting:
 - Training scripts: `<WORKING_DIR>/<PROJECT_DIR>/`
 - Model weights: `<WORKING_DIR>/<MODEL_FILE>.pt`
-- LMDB data: `<WORKING_DIR>/<DATA>.lmdb`
-- Dict file: `<WORKING_DIR>/dict.txt`
+- LMDB data: `<DATA_DISK_PATH>/<DATA>.lmdb`
+- Dict file: `<DATA_DISK_PATH>/dict.txt`
 
 ## Common Workflows
 
 ### 1. Submit Training Job
 
-1. Connect via SSH using `invoke_shell()`
-2. Upload training code via SFTP to `<WORKING_DIR>/<PROJECT_DIR>/`
-3. Ensure model weights exist: `ls -la <WORKING_DIR>/*.pt`
-4. Run training: `CUDA_VISIBLE_DEVICES=<GPU_ID> nohup python -u <SCRIPT>.py > <LOG>.txt 2>&1 &`
-5. Disconnect — job continues in background
-6. Reconnect later: `tail <LOG>.txt`
+1. **Check data disk is mounted** before uploading files: `df -h`
+2. Connect via SSH using `invoke_shell()`
+3. Upload training code via SFTP to `<DATA_DISK_PATH>/<PROJECT_DIR>/`
+4. Ensure model weights exist: `ls -la <DATA_DISK_PATH>/*.pt`
+5. Run training: `CUDA_VISIBLE_DEVICES=<GPU_ID> nohup python -u <SCRIPT>.py > <LOG>.txt 2>&1 &`
+6. Disconnect — job continues in background
+7. Reconnect later: `tail <LOG>.txt`
 
 ### 2. Monitor Running Job
 
@@ -204,9 +213,14 @@ tail -10 <WORKING_DIR>/<LOG>.txt
 
 ### 3. Transfer Large Files
 
-Large files (100MB+) take time. Upload via SFTP:
+Large files (100MB+) take time. Upload via SFTP to data disk:
 ```python
-sftp.put('/local/model.pt', '/remote/workspace/model.pt')
+sftp.put('/local/model.pt', '<DATA_DISK_PATH>/workspace/model.pt')
+```
+
+**Always verify data disk has space before transferring:**
+```bash
+df -h /mnt/data/
 ```
 
 ## Troubleshooting
@@ -230,6 +244,33 @@ sftp.put('/local/model.pt', '/remote/workspace/model.pt')
   rm -rf /root/.cache/pip /root/.cache/huggingface /root/.cache/JetBrains
   ```
 - Keep at least 5GB free for checkpoints
+
+### Data Disk Advisory
+
+AI Galaxy instances have a **50GB system disk** and an **additional data disk** (typically 500GB+). **Store large files (datasets, models, LMDB data) on the data disk**, not the system disk.
+
+**Check for data disk:**
+```bash
+fdisk -l | grep /dev
+df -h
+```
+
+**Common data disk paths:**
+- `/mnt/data`
+- `/data`
+- `/root/workspace/` (may be on data disk)
+
+**Format and mount data disk (if not mounted):**
+```bash
+mkfs.xfs -f /dev/vdb
+mount /dev/vdb /mnt/data
+```
+
+**Verify disk usage:**
+```bash
+df -h /mnt/data/
+du -sh /mnt/data/*
+```
 
 ### Missing Modules
 
